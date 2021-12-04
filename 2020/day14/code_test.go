@@ -17,7 +17,7 @@ func TestSolve1(t *testing.T) {
 func TestSolve2(t *testing.T) {
 	input := map[string]int{
 		"./input_test2.txt": 208,
-		// "./input.txt":      0,
+		"./input.txt":       3161838538691,
 	}
-	testhelper.Runner(t, day14.Solve1, input)
+	testhelper.Runner(t, day14.Solve2, input)
 }

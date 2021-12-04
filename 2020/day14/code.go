@@ -3,7 +3,6 @@ package day14
 import (
 	"adventofcode/helper"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 
@@ -29,12 +28,49 @@ func (b binaryNumber) toDecimal() (int64, error) {
 	return strconv.ParseInt(string(b), 2, 64)
 }
 
-func (b binaryNumber) expand() []binaryNumber {
-	panic("not implemented")
+func (b binaryNumber) expand(mask binaryNumber, idx int) []binaryNumber {
+	if idx >= len(b) {
+		return nil
+	}
+
+	var possibilities []binaryNumber
+	switch mask[idx] {
+	case '0':
+		possibilities = append(possibilities, binaryNumber(b[idx]))
+	case '1':
+		possibilities = append(possibilities, "1")
+	default:
+		possibilities = append(possibilities, "0", "1")
+	}
+
+	nextPossibilities := b.expand(mask, idx+1)
+	if len(nextPossibilities) == 0 {
+		return possibilities
+	}
+
+	var result []binaryNumber
+	for _, nextPossibility := range nextPossibilities {
+		for _, thisPossibility := range possibilities {
+			result = append(result, thisPossibility+nextPossibility)
+		}
+	}
+
+	return result
+}
+
+func (b binaryNumber) trimmedString() string {
+	result := string(b)
+	for {
+		newResult := strings.TrimPrefix(result, "0")
+		if len(newResult) == len(result) {
+			return result
+		}
+		result = newResult
+	}
 }
 
 type assignment struct {
-	memoryAddress int
+	memoryAddress int64
 	value         binaryNumber
 }
 
@@ -58,11 +94,10 @@ type program struct {
 func (p *program) run() error {
 	var err error
 	for _, a := range p.assignments {
-		p.memory[a.memoryAddress], err = a.value.toDecimal()
+		p.memory[int(a.memoryAddress)], err = a.value.toDecimal()
 		if err != nil {
 			return errors.Wrap(err, "")
 		}
-		log.Printf("Assigned %s to memory address %d", a.value, a.memoryAddress)
 	}
 	return nil
 }
@@ -78,7 +113,7 @@ func parseAssignment(line string) (*assignment, error) {
 	}
 	addressStr := strings.TrimSuffix(strings.TrimPrefix(lineParts[0], "mem["), "]")
 	var err error
-	a.memoryAddress, err = strconv.Atoi(addressStr)
+	a.memoryAddress, err = strconv.ParseInt(addressStr, 10, 64)
 	if err != nil {
 		return nil, errors.Wrap(err, "")
 	}
@@ -91,6 +126,38 @@ func parseAssignment(line string) (*assignment, error) {
 
 	a.value = binNumber.pad(36)
 	return a, nil
+}
+
+func parseAssignmentV2(line string, mask binaryNumber) ([]*assignment, error) {
+	var result []*assignment
+	lineParts := strings.Split(line, " = ")
+	if len(lineParts) != 2 {
+		return nil, errors.New(fmt.Sprintf("Expected %s to have 2 parts, but has %d", line, len(lineParts)))
+	}
+
+	decNumber, err := strconv.ParseInt(lineParts[1], 10, 64)
+	if err != nil {
+		return nil, errors.Wrap(err, "")
+	}
+	binNumber := binaryNumber(strconv.FormatInt(decNumber, 2))
+
+	addressStr := strings.TrimSuffix(strings.TrimPrefix(lineParts[0], "mem["), "]")
+	addressInt, err := strconv.ParseInt(addressStr, 10, 64)
+	if err != nil {
+		return nil, errors.Wrap(err, "")
+	}
+	addressBinaryStr := binaryNumber(strconv.FormatInt(addressInt, 2)).pad(36)
+	expandedAddresses := binaryNumber(addressBinaryStr).expand(mask, 0)
+
+	for _, address := range expandedAddresses {
+		a := &assignment{value: binNumber.pad(36)}
+		a.memoryAddress, err = strconv.ParseInt(string(address), 2, 64)
+		if err != nil {
+			return nil, errors.Wrap(err, "")
+		}
+		result = append(result, a)
+	}
+	return result, nil
 }
 
 func Solve1(inputFilePath string) (int, error) {
@@ -109,7 +176,6 @@ func Solve1(inputFilePath string) (int, error) {
 		if err != nil {
 			return 0, errors.Wrap(err, "")
 		}
-		log.Printf("Instruction %s parses to %+v", fileLine, a)
 		a.mask(currentMask)
 		p.assignments = append(p.assignments, a)
 	}
@@ -118,7 +184,6 @@ func Solve1(inputFilePath string) (int, error) {
 		return 0, errors.Wrap(err, "")
 	}
 	memory := p.memory
-	log.Printf("Memory: %v", memory)
 	var sum int64 = 0
 	for _, m := range memory {
 		sum += m
@@ -127,5 +192,31 @@ func Solve1(inputFilePath string) (int, error) {
 }
 
 func Solve2(inputFilePath string) (int, error) {
-	panic("not implemented")
+	fileLineCh := helper.FileLineReader(inputFilePath)
+
+	p := &program{
+		memory: map[int]int64{},
+	}
+	var currentMask binaryNumber
+	for fileLine := range fileLineCh {
+		if strings.HasPrefix(fileLine, "mask") {
+			currentMask = parseMask(fileLine)
+			continue
+		}
+		a, err := parseAssignmentV2(fileLine, currentMask)
+		if err != nil {
+			return 0, errors.Wrap(err, "")
+		}
+		p.assignments = append(p.assignments, a...)
+	}
+
+	if err := p.run(); err != nil {
+		return 0, errors.Wrap(err, "")
+	}
+	memory := p.memory
+	var sum int64 = 0
+	for _, m := range memory {
+		sum += m
+	}
+	return int(sum), nil
 }
