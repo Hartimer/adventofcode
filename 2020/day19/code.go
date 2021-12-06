@@ -20,17 +20,18 @@ func safePrintf(str string, args ...interface{}) {
 
 type rule interface {
 	fmt.Stringer
-	matches(map[int]rule, string) (string, bool)
+	matches(map[int]rule, string, bool) (string, bool)
 }
 
 type literalRule struct {
 	letter string
 }
 
-func (l literalRule) matches(_ map[int]rule, str string) (string, bool) {
+func (l literalRule) matches(_ map[int]rule, str string, producesEmpty bool) (string, bool) {
 	if len(str) > 0 && string(str[0]) == l.letter {
 		safePrintf("Literal rule %q matched %s. Returning remaining", l.letter, str)
-		return str[1:], true
+		result := str[1:]
+		return result, !producesEmpty || len(result) == 0
 	}
 	return "", false
 }
@@ -45,17 +46,17 @@ type compositeRule struct {
 	subRules []rule
 }
 
-func (c compositeRule) matches(rules map[int]rule, str string) (string, bool) {
+func (c compositeRule) matches(rules map[int]rule, str string, producesEmpty bool) (string, bool) {
 	workingStr := str
 	for ruleIdx, subRule := range c.subRules {
 		var valid bool
-		workingStr, valid = subRule.matches(rules, workingStr)
+		workingStr, valid = subRule.matches(rules, workingStr, producesEmpty && ruleIdx == len(c.subRules)-1)
 		if !valid {
 			return str, false
 		}
 		safePrintf("Composite index %d out of %s is valid", ruleIdx, c)
 	}
-	return workingStr, true
+	return workingStr, len(workingStr) == 0
 }
 
 func (c compositeRule) String() string {
@@ -73,12 +74,12 @@ type orRule struct {
 	rightSide rule
 }
 
-func (o orRule) matches(rules map[int]rule, str string) (string, bool) {
-	if result, valid := o.leftSide.matches(rules, str); valid {
+func (o orRule) matches(rules map[int]rule, str string, producesEmpty bool) (string, bool) {
+	if result, valid := o.leftSide.matches(rules, str, producesEmpty); valid {
 		safePrintf("Left side of %s is valid", o)
 		return result, true
 	}
-	if result, valid := o.rightSide.matches(rules, str); valid {
+	if result, valid := o.rightSide.matches(rules, str, producesEmpty); valid {
 		safePrintf("Right side of %s is valid", o)
 		return result, true
 	}
@@ -95,8 +96,8 @@ type referenceRule struct {
 	ruleIdx int
 }
 
-func (r referenceRule) matches(rules map[int]rule, str string) (string, bool) {
-	result, valid := rules[r.ruleIdx].matches(rules, str)
+func (r referenceRule) matches(rules map[int]rule, str string, producesEmpty bool) (string, bool) {
+	result, valid := rules[r.ruleIdx].matches(rules, str, producesEmpty)
 	if valid {
 		safePrintf("Reference rule pointing at %d is valid", r.ruleIdx)
 	}
@@ -156,7 +157,7 @@ func Solve1(inputFilePath string) (int, error) {
 				return 0, errors.Wrap(err, "")
 			}
 			currentRules[ruleIdx] = parseRule(ruleParts[1])
-		} else if remainingStr, valid := currentRules[0].matches(currentRules, fileLine); valid && len(remainingStr) == 0 {
+		} else if remainingStr, valid := currentRules[0].matches(currentRules, fileLine, true); valid && len(remainingStr) == 0 {
 			matchCount++
 			log.Printf("%s patches", fileLine)
 		}
