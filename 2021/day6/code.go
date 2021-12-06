@@ -8,6 +8,31 @@ import (
 	"github.com/pkg/errors"
 )
 
+func solveImproved(inputFilePath string, days int) (int, error) {
+	inputs := <-helper.FileLineReader(inputFilePath)
+
+	timers := make([]int, 9)
+	for _, rawFish := range strings.Split(inputs, ",") {
+		timer, err := strconv.Atoi(rawFish)
+		if err != nil {
+			return 0, errors.Wrap(err, "")
+		}
+		timers[timer]++
+	}
+
+	for i := 0; i < days; i++ {
+		breedingFish := timers[0]
+		timers = append(timers[1:], breedingFish)
+		timers[6] += breedingFish
+	}
+
+	count := 0
+	for _, c := range timers {
+		count += c
+	}
+	return count, nil
+}
+
 func solve(inputFilePath string, days int) (int, error) {
 	inputs := <-helper.FileLineReader(inputFilePath)
 
@@ -48,9 +73,9 @@ func solve(inputFilePath string, days int) (int, error) {
 }
 
 func Solve1(inputFilePath string) (int, error) {
-	return solve(inputFilePath, 80)
+	return solveImproved(inputFilePath, 80)
 }
 
 func Solve2(inputFilePath string) (int, error) {
-	return solve(inputFilePath, 256)
+	return solveImproved(inputFilePath, 256)
 }
