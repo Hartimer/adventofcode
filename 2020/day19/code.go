@@ -3,13 +3,23 @@ package day19
 import (
 	"adventofcode/helper"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
 )
 
+const verbose = false
+
+func safePrintf(str string, args ...interface{}) {
+	if verbose {
+		log.Printf(str, args...)
+	}
+}
+
 type rule interface {
+	fmt.Stringer
 	matches(map[int]rule, string) (string, bool)
 }
 
@@ -18,14 +28,15 @@ type literalRule struct {
 }
 
 func (l literalRule) matches(_ map[int]rule, str string) (string, bool) {
-	if len(str) == 0 {
-		return "", false
+	if len(str) > 0 && string(str[0]) == l.letter {
+		safePrintf("Literal rule %q matched %s. Returning remaining", l.letter, str)
+		return str[1:], true
 	}
-	firstLetter := string(str[0])
-	if firstLetter == l.letter {
-		return strings.TrimPrefix(str, firstLetter), true
-	}
-	return str, false
+	return "", false
+}
+
+func (l literalRule) String() string {
+	return fmt.Sprintf("%q", l.letter)
 }
 
 var _ rule = literalRule{}
@@ -36,14 +47,23 @@ type compositeRule struct {
 
 func (c compositeRule) matches(rules map[int]rule, str string) (string, bool) {
 	workingStr := str
-	for _, subRule := range c.subRules {
+	for ruleIdx, subRule := range c.subRules {
 		var valid bool
 		workingStr, valid = subRule.matches(rules, workingStr)
 		if !valid {
 			return str, false
 		}
+		safePrintf("Composite index %d out of %s is valid", ruleIdx, c)
 	}
 	return workingStr, true
+}
+
+func (c compositeRule) String() string {
+	var strs []string
+	for _, subRule := range c.subRules {
+		strs = append(strs, subRule.String())
+	}
+	return strings.Join(strs, " ")
 }
 
 var _ rule = compositeRule{}
@@ -55,12 +75,18 @@ type orRule struct {
 
 func (o orRule) matches(rules map[int]rule, str string) (string, bool) {
 	if result, valid := o.leftSide.matches(rules, str); valid {
+		safePrintf("Left side of %s is valid", o)
 		return result, true
 	}
 	if result, valid := o.rightSide.matches(rules, str); valid {
+		safePrintf("Right side of %s is valid", o)
 		return result, true
 	}
 	return str, false
+}
+
+func (o orRule) String() string {
+	return fmt.Sprintf("%s | %s", o.leftSide.String(), o.rightSide.String())
 }
 
 var _ rule = orRule{}
@@ -70,7 +96,15 @@ type referenceRule struct {
 }
 
 func (r referenceRule) matches(rules map[int]rule, str string) (string, bool) {
-	return rules[r.ruleIdx].matches(rules, str)
+	result, valid := rules[r.ruleIdx].matches(rules, str)
+	if valid {
+		safePrintf("Reference rule pointing at %d is valid", r.ruleIdx)
+	}
+	return result, valid
+}
+
+func (r referenceRule) String() string {
+	return strconv.Itoa(r.ruleIdx)
 }
 
 var _ rule = referenceRule{}
@@ -124,6 +158,7 @@ func Solve1(inputFilePath string) (int, error) {
 			currentRules[ruleIdx] = parseRule(ruleParts[1])
 		} else if remainingStr, valid := currentRules[0].matches(currentRules, fileLine); valid && len(remainingStr) == 0 {
 			matchCount++
+			log.Printf("%s patches", fileLine)
 		}
 	}
 
