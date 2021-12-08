@@ -9,7 +9,7 @@ import (
 func TestSolve1(t *testing.T) {
 	input := testhelper.Inputs{
 		"./input_test.txt": 26,
-		"./input.txt":      0,
+		"./input.txt":      456,
 	}
 	testhelper.Runner(t, day8.Solve1, input)
 }
