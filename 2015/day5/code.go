@@ -44,13 +44,12 @@ func Solve1(inputFilePath string) (int, error) {
 }
 
 var pairRepeats = func(s string) bool {
-	workingPairs := s[:3]
-	str := s
-	for str = str[2:]; len(str) > 0; str = str[1:] {
-		if strings.Contains(str, workingPairs[:2]) || strings.Contains(str[1:], workingPairs[1:3]) {
+	for workingIdx := 2; workingIdx < len(s); workingIdx++ {
+		pair := s[workingIdx-2 : workingIdx]
+		remainingStr := s[workingIdx:]
+		if strings.Contains(remainingStr, pair) {
 			return true
 		}
-		workingPairs = workingPairs[1:] + string(str[0])
 	}
 	return false
 }

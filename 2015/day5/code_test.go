@@ -17,7 +17,7 @@ func TestSolve1(t *testing.T) {
 func TestSolve2(t *testing.T) {
 	inputs := map[string]int{
 		"./input_test2.txt": 3,
-		// "./input.txt":       0, // Currently returns 49, which is wrong
+		"./input.txt":       55,
 	}
 	testhelper.Runner(t, day5.Solve2, inputs)
 }
