@@ -5,6 +5,10 @@ import (
 	"os"
 )
 
+// FileLineReader returns a channel where lines from the filepath provided as an argument
+// are pushed to.
+//
+// Note that we do not check for scanner errors in the end.
 func FileLineReader(inputFilePath string) chan string {
 	c := make(chan string)
 	go func() {
