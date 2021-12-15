@@ -17,9 +17,7 @@ func TestSolve1(t *testing.T) {
 func TestSolve2(t *testing.T) {
 	input := testhelper.Inputs{
 		"./input_test.txt": 2188189693529,
-		// "./input.txt":      0,
+		"./input.txt":      2984946368465,
 	}
 	testhelper.Runner(t, day14.Solve2, input)
 }
-
-//

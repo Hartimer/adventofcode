@@ -2,15 +2,11 @@ package day14
 
 import (
 	"adventofcode/helper"
+	"log"
 	"math"
 
 	"github.com/pkg/errors"
 )
-
-type pair struct {
-	p string
-	l string
-}
 
 func parseInputs(inputFilePath string) (string, map[string]string, error) {
 	var formula string
@@ -33,31 +29,49 @@ func parseInputs(inputFilePath string) (string, map[string]string, error) {
 	return formula, pairs, nil
 }
 
-func solve(formula []byte, pairs map[string]string, targetIterations int) int {
-	var result []byte
-	for iterations := 0; iterations < targetIterations; iterations, formula, result = iterations+1, result, make([]byte, 0, len(result)*2) {
-		for i := 0; i < len(formula)-1; i++ {
-			pair := formula[i : i+2]
-			if letter, exists := pairs[string(pair)]; exists {
-				if len(result) == 0 || result[len(result)-1] != pair[0] {
-					result = append(result, pair[0], letter[0], pair[1])
-				} else {
-					result = append(result, letter[0], pair[1])
-				}
-			}
+func solve(formula []byte, rules map[string]string, targetIterations int) int {
+	charCount := map[byte]int{}
+	pairCount := map[string]int{}
+	for i := 0; i < len(formula)-1; i++ {
+		pair := formula[i : i+2]
+		if _, exists := pairCount[string(string(pair))]; !exists {
+			pairCount[string(string(pair))] = 0
 		}
+		pairCount[string(pair)]++
+		if _, exists := charCount[formula[i]]; !exists {
+			charCount[formula[i]] = 0
+		}
+		charCount[formula[i]]++
+	}
+	if _, exists := charCount[formula[len(formula)-1]]; !exists {
+		charCount[formula[len(formula)-1]] = 1
+	} else {
+		charCount[formula[len(formula)-1]]++
 	}
 
-	stats := map[byte]int{}
-	for _, r := range formula {
-		if _, exists := stats[r]; !exists {
-			stats[r] = 0
+	for iterations := 0; iterations < targetIterations; iterations++ {
+		newPairCount := map[string]int{}
+		for pair, originalPairCount := range pairCount {
+			letter, exists := rules[string(pair)]
+			if !exists {
+				continue
+			}
+			leftPair := append([]byte(pair[:1]), letter[0])
+			rightPair := append([]byte{letter[0]}, []byte(pair[1:])...)
+
+			newPairCount[string(leftPair)] += originalPairCount
+			newPairCount[string(rightPair)] += originalPairCount
+			if _, exists := charCount[letter[0]]; !exists {
+				charCount[letter[0]] = 0
+			}
+			charCount[letter[0]] += originalPairCount
 		}
-		stats[r]++
+		pairCount = newPairCount
 	}
 
 	max, min := math.MinInt, math.MaxInt
-	for _, count := range stats {
+	for c, count := range charCount {
+		log.Printf("%s: %d", string(c), count)
 		if count > max {
 			max = count
 		}
