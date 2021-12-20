@@ -20,7 +20,7 @@ func TestParsing(t *testing.T) {
 		"[[[[1,3],[5,3]],[[1,3],[8,7]]],[[[4,9],[6,9]],[[8,2],[7,3]]]]",
 	}
 	for _, i := range inputs {
-		n, _, err := day18.ParseRemaining(i)
+		n, _, err := day18.ParseRemaining2(i, nil)
 		require.NoError(t, err)
 		require.Equal(t, i, n.String())
 	}
@@ -31,33 +31,40 @@ func TestExplode(t *testing.T) {
 		start    string
 		expected string
 	}{
+		// {
+		// 	start:    "[[[[[9,8],1],2],3],4]",
+		// 	expected: "[[[[0,9],2],3],4]",
+		// },
+		// {
+		// 	start:    "[7,[6,[5,[4,[3,2]]]]]",
+		// 	expected: "[7,[6,[5,[7,0]]]]",
+		// },
+		// {
+		// 	start:    "[[6,[5,[4,[3,2]]]],1]",
+		// 	expected: "[[6,[5,[7,0]]],3]",
+		// },
+		// {
+		// 	start:    "[[3,[2,[1,[7,3]]]],[6,[5,[4,[3,2]]]]]",
+		// 	expected: "[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]",
+		// },
+		// {
+		// 	start:    "[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]",
+		// 	expected: "[[3,[2,[8,0]]],[9,[5,[7,0]]]]",
+		// },
 		{
-			start:    "[[[[[9,8],1],2],3],4]",
-			expected: "[[[[0,9],2],3],4]",
-		},
-		{
-			start:    "[7,[6,[5,[4,[3,2]]]]]",
-			expected: "[7,[6,[5,[7,0]]]]",
-		},
-		{
-			start:    "[[6,[5,[4,[3,2]]]],1]",
-			expected: "[[6,[5,[7,0]]],3]",
-		},
-		{
-			start:    "[[3,[2,[1,[7,3]]]],[6,[5,[4,[3,2]]]]]",
-			expected: "[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]",
-		},
-		{
-			start:    "[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]",
-			expected: "[[3,[2,[8,0]]],[9,[5,[7,0]]]]",
+			start:    "[[[[4,0],[5,4]],[[7,7],[6,0]]],[[7,[5,5]],[[[5,6],9],[[6,6],0]]]]",
+			expected: "[[[[4,0],[5,4]],[[7,7],[6,0]]],[[8,[7,7]],[[7,9],[5,0]]]]",
 		},
 	}
 	for _, i := range inputs {
 		t.Run(fmt.Sprintf("%q should explode into %q", i.start, i.expected), func(t *testing.T) {
-			n, _, err := day18.ParseRemaining(i.start)
+			n, _, err := day18.ParseRemaining2(i.start, nil)
 			require.NoError(t, err)
-			n, _, _, exploded := n.Explode(0)
-			require.True(t, exploded)
+			exploded := n.Explode()
+			for exploded {
+				exploded = n.Explode()
+			}
+			// require.True(t, exploded)
 			require.Equal(t, i.expected, n.String())
 		})
 	}
@@ -66,9 +73,9 @@ func TestExplode(t *testing.T) {
 func TestFullExample(t *testing.T) {
 	expr1 := "[[[[4,3],4],4],[7,[[8,4],9]]]"
 	expr2 := "[1,1]"
-	n1, _, err := day18.ParseRemaining(expr1)
+	n1, _, err := day18.ParseRemaining2(expr1, nil)
 	require.NoError(t, err)
-	n2, _, err := day18.ParseRemaining(expr2)
+	n2, _, err := day18.ParseRemaining2(expr2, nil)
 	require.NoError(t, err)
 
 	// Add
@@ -76,27 +83,27 @@ func TestFullExample(t *testing.T) {
 	require.Equal(t, "[[[[[4,3],4],4],[7,[[8,4],9]]],[1,1]]", n.String())
 
 	// Explode
-	n, _, _, exploded := n.Explode(0)
+	exploded := n.Explode()
 	require.True(t, exploded)
 	require.Equal(t, "[[[[0,7],4],[7,[[8,4],9]]],[1,1]]", n.String())
 
 	// Explode
-	n, _, _, exploded = n.Explode(0)
+	exploded = n.Explode()
 	require.True(t, exploded)
 	require.Equal(t, "[[[[0,7],4],[15,[0,13]]],[1,1]]", n.String())
 
 	// Split
-	n, split := n.Split()
+	split := n.Split()
 	require.True(t, split)
 	require.Equal(t, "[[[[0,7],4],[[7,8],[0,13]]],[1,1]]", n.String())
 
 	// Split
-	n, split = n.Split()
+	split = n.Split()
 	require.True(t, split)
 	require.Equal(t, "[[[[0,7],4],[[7,8],[0,[6,7]]]],[1,1]]", n.String())
 
 	// Explode
-	n, _, _, exploded = n.Explode(0)
+	exploded = n.Explode()
 	require.True(t, exploded)
 	require.Equal(t, "[[[[0,7],4],[[7,8],[6,0]]],[8,1]]", n.String())
 }
@@ -143,23 +150,21 @@ func TestFullTarget(t *testing.T) {
 	}
 	for _, i := range inputs {
 		input := i.numbers
-		problemNumber, _, err := day18.ParseRemaining(input[0])
+		problemNumber, _, err := day18.ParseRemaining2(input[0], nil)
 		require.NoError(t, err)
 		input = input[1:]
 
 		for len(input) > 0 {
-			nextN, _, err := day18.ParseRemaining(input[0])
+			nextN, _, err := day18.ParseRemaining2(input[0], nil)
 			require.NoError(t, err)
 			input = input[1:]
 			problemNumber = problemNumber.Add(nextN)
 			for {
-				problemNumber, _, _, _ = problemNumber.Explode(0)
-				newN, Split := problemNumber.Split()
-				if Split {
-					problemNumber = newN
-					continue
+				exploded := problemNumber.Explode()
+				split := problemNumber.Split()
+				if !exploded && !split {
+					break
 				}
-				break
 			}
 		}
 		require.Equal(t, i.expected, problemNumber.String())

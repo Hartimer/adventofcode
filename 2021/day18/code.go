@@ -3,11 +3,193 @@ package day18
 import (
 	"adventofcode/helper"
 	"fmt"
+	"log"
 	"math"
 	"strconv"
 
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 )
+
+type Node struct {
+	ID       string
+	Val      *int
+	Previous *Node
+	Children [2]*Node
+}
+
+func (n *Node) Add(n2 *Node) *Node {
+	newNode := &Node{
+		ID:       uuid.NewString(),
+		Children: [2]*Node{n, n2},
+	}
+	n.Previous = newNode
+	n2.Previous = newNode
+	return newNode
+}
+
+func (n *Node) String() string {
+	if n.Val != nil {
+		return fmt.Sprintf("%d", *n.Val)
+	}
+	left := n.Children[0].String()
+	right := n.Children[1].String()
+	return fmt.Sprintf("[%s,%s]", left, right)
+}
+
+func (n *Node) Depth() int {
+	counter := 0
+	for current := n; current != nil; current = current.Previous {
+		counter++
+	}
+	return counter
+}
+
+func (n *Node) IsLeaf() bool {
+	return n.Val != nil
+}
+
+func (n *Node) IsLeftNode(n2 *Node) bool {
+	return len(n.Children) > 0 && n.Children[0].ID == n2.ID
+}
+
+func (n *Node) IsRightNode(n2 *Node) bool {
+	return len(n.Children) > 0 && n.Children[1].ID == n2.ID
+}
+
+func (n *Node) addInternal(idx, v int) {
+	if n.Val != nil {
+		nVal := *n.Val + v
+		n.Val = &nVal
+		return
+	}
+
+	workingNode := n.Children[idx]
+	for workingNode != nil {
+		if workingNode.IsLeaf() {
+			newVal := *workingNode.Val + v
+			workingNode.Val = &newVal
+			break
+		}
+		workingNode = workingNode.Children[idx]
+	}
+}
+
+func (n *Node) AddLeft(v int) {
+	n.addInternal(0, v)
+}
+
+func (n *Node) AddRight(v int) {
+	n.addInternal(1, v)
+}
+
+func (n *Node) Explode() bool {
+	if n.Val != nil && *n.Val == 7 {
+		log.Printf("Lets")
+	}
+	if n.Depth() > 4 && !n.IsLeaf() && n.Children[0].IsLeaf() && n.Children[1].IsLeaf() {
+		zero := 0
+
+		leftVal, rightVal := n.Children[0].Val, n.Children[1].Val
+		if n.Previous.IsLeftNode(n) {
+			n.Previous.Children[0] = &Node{ID: uuid.NewString(), Val: &zero}
+			n.Previous.Children[1].AddLeft(*rightVal)
+			current := n.Previous.Previous
+			if current.IsLeftNode(n.Previous) {
+				for current != nil {
+					if current.Previous == nil {
+						current = nil
+						break
+					} else {
+						previousCurrent := current
+						current = current.Previous
+						if !current.IsLeftNode(previousCurrent) {
+							break
+						}
+					}
+				}
+			}
+			if current != nil {
+				current.Children[0].AddRight(*leftVal)
+			}
+		} else {
+			n.Previous.Children[1] = &Node{ID: uuid.NewString(), Val: &zero}
+			n.Previous.Children[0].AddRight(*leftVal)
+			current := n.Previous.Previous
+			if current.IsRightNode(n.Previous) {
+				for current != nil {
+					if current.Previous == nil {
+						current = nil
+						break
+					} else {
+						previousCurrent := current
+						current = current.Previous
+						if !current.IsRightNode(previousCurrent) {
+							break
+						}
+					}
+				}
+			}
+			if current != nil {
+				current.Children[1].AddLeft(*rightVal)
+			}
+		}
+		return true
+	}
+	for _, c := range n.Children {
+		if !c.IsLeaf() && c.Explode() {
+			return true
+		}
+	}
+	return false
+}
+
+func (n *Node) Split() bool {
+	if n.Val != nil {
+		if *n.Val >= 10 {
+			left := int(math.Floor(float64(*n.Val) / 2))
+			lNode := &Node{ID: uuid.NewString(), Val: &left}
+			right := int(math.Ceil(float64(*n.Val) / 2))
+			rNode := &Node{ID: uuid.NewString(), Val: &right}
+			n.Children = [2]*Node{lNode, rNode}
+			n.Val = nil
+			return true
+		}
+		return false
+	}
+	if n.Children[0].Split() {
+		return true
+	}
+	if n.Children[1].Split() {
+		return true
+	}
+	return false
+}
+
+func ParseRemaining2(str string, previous *Node) (*Node, string, error) {
+	switch str[0] {
+	case '[':
+		current := &Node{ID: uuid.NewString(), Previous: previous}
+		leftSide, remaining, err := ParseRemaining2(str[1:], current)
+		if err != nil {
+			return nil, "", errors.Wrap(err, "")
+		}
+		rightSide, remaining, err := ParseRemaining2(remaining, current)
+		if err != nil {
+			return nil, "", errors.Wrap(err, "")
+		}
+		current.Children = [2]*Node{leftSide, rightSide}
+		return current, remaining, nil
+	case ']', ',':
+		return ParseRemaining2(str[1:], previous)
+	default:
+		n, err := strconv.Atoi(string(str[0]))
+		if err != nil {
+			return nil, "", errors.Wrap(err, "")
+		}
+		return &Node{ID: uuid.NewString(), Val: &n, Previous: previous}, str[2:], nil
+	}
+}
 
 type Number interface {
 	fmt.Stringer
