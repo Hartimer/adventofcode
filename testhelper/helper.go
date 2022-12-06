@@ -23,3 +23,17 @@ func Runner(t *testing.T, solver Solver, inputs Inputs) {
 		})
 	}
 }
+
+type SolverString func(string) (string, error)
+
+type InputsString map[string]string
+
+func RunnerString(t *testing.T, solver SolverString, inputs InputsString) {
+	for filename, expected := range inputs {
+		t.Run(fmt.Sprintf("%s should output %s", filename, expected), func(t *testing.T) {
+			result, err := solver(filename)
+			require.NoError(t, err)
+			require.Equal(t, expected, result)
+		})
+	}
+}
