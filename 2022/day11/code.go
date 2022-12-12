@@ -19,7 +19,7 @@ type monkey struct {
 	monkeyIfTrue      int
 	monkeyIfFalse     int
 	inspectedItems    int
-	worryLevelDivider int
+	worryLevelFunc    func(int) int
 }
 
 func (m *monkey) inspectAllItems(group monkeyGroup) {
@@ -32,7 +32,7 @@ func (m *monkey) inspectAllItems(group monkeyGroup) {
 
 func (m *monkey) inspectItem(item int, group monkeyGroup) {
 	m.inspectedItems++
-	worryLevel := m.op(item) / m.worryLevelDivider
+	worryLevel := m.worryLevelFunc(m.op(item))
 
 	if worryLevel%m.divisibleByNumber == 0 {
 		group[m.monkeyIfTrue].items = append(group[m.monkeyIfTrue].items, worryLevel)
@@ -79,7 +79,7 @@ func parseOp(rawOp string) func(int) int {
 	}
 }
 
-func parseMonkeyGroup(inputFilePath string, worryLevelDivider int) (monkeyGroup, error) {
+func parseMonkeyGroup(inputFilePath string, worryLevelFunc func(int) int) (monkeyGroup, error) {
 	group := monkeyGroup{}
 	monkeyRawContents := []string{}
 	for fileLine := range helper.FileLineReader(inputFilePath) {
@@ -91,7 +91,7 @@ func parseMonkeyGroup(inputFilePath string, worryLevelDivider int) (monkeyGroup,
 		monkeyRawContents = append(monkeyRawContents, fileLine)
 		if len(monkeyRawContents) == 6 {
 			var err error
-			m := monkey{worryLevelDivider: worryLevelDivider}
+			m := monkey{worryLevelFunc: worryLevelFunc}
 			m.id, err = strconv.Atoi(strings.TrimPrefix(strings.TrimSuffix(monkeyRawContents[0], ":"), "Monkey "))
 			if err != nil {
 				return nil, errors.Wrap(err, "")
@@ -131,15 +131,19 @@ func parseMonkeyGroup(inputFilePath string, worryLevelDivider int) (monkeyGroup,
 }
 
 func Solve1(inputFilePath string) (int, error) {
-	return solve(inputFilePath, 3, 20)
+	return solve(inputFilePath, func(w int) int {
+		return w / 3
+	}, 20)
 }
 
 func Solve2(inputFilePath string) (int, error) {
-	return solve(inputFilePath, 2, 10_000)
+	return solve(inputFilePath, func(w int) int {
+		return w % 9699690
+	}, 10_000)
 }
 
-func solve(inputFilePath string, worryLevelDivider int, rounds int) (int, error) {
-	group, err := parseMonkeyGroup(inputFilePath, worryLevelDivider)
+func solve(inputFilePath string, worryLevelFunc func(int) int, rounds int) (int, error) {
+	group, err := parseMonkeyGroup(inputFilePath, worryLevelFunc)
 	if err != nil {
 		return 0, errors.Wrap(err, "")
 	}
