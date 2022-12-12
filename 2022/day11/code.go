@@ -19,6 +19,7 @@ type monkey struct {
 	monkeyIfTrue      int
 	monkeyIfFalse     int
 	inspectedItems    int
+	worryLevelDivider int
 }
 
 func (m *monkey) inspectAllItems(group monkeyGroup) {
@@ -31,12 +32,12 @@ func (m *monkey) inspectAllItems(group monkeyGroup) {
 
 func (m *monkey) inspectItem(item int, group monkeyGroup) {
 	m.inspectedItems++
-	worryLevel := m.op(item) / 3
+	worryLevel := m.op(item) / m.worryLevelDivider
 
 	if worryLevel%m.divisibleByNumber == 0 {
-		group[m.monkeyIfTrue].items = append(group[m.monkeyIfTrue].items, item)
+		group[m.monkeyIfTrue].items = append(group[m.monkeyIfTrue].items, worryLevel)
 	} else {
-		group[m.monkeyIfFalse].items = append(group[m.monkeyIfFalse].items, item)
+		group[m.monkeyIfFalse].items = append(group[m.monkeyIfFalse].items, worryLevel)
 	}
 }
 
@@ -78,7 +79,7 @@ func parseOp(rawOp string) func(int) int {
 	}
 }
 
-func parseMonkeyGroup(inputFilePath string) (monkeyGroup, error) {
+func parseMonkeyGroup(inputFilePath string, worryLevelDivider int) (monkeyGroup, error) {
 	group := monkeyGroup{}
 	monkeyRawContents := []string{}
 	for fileLine := range helper.FileLineReader(inputFilePath) {
@@ -90,7 +91,7 @@ func parseMonkeyGroup(inputFilePath string) (monkeyGroup, error) {
 		monkeyRawContents = append(monkeyRawContents, fileLine)
 		if len(monkeyRawContents) == 6 {
 			var err error
-			m := monkey{}
+			m := monkey{worryLevelDivider: worryLevelDivider}
 			m.id, err = strconv.Atoi(strings.TrimPrefix(strings.TrimSuffix(monkeyRawContents[0], ":"), "Monkey "))
 			if err != nil {
 				return nil, errors.Wrap(err, "")
@@ -130,11 +131,19 @@ func parseMonkeyGroup(inputFilePath string) (monkeyGroup, error) {
 }
 
 func Solve1(inputFilePath string) (int, error) {
-	group, err := parseMonkeyGroup(inputFilePath)
+	return solve(inputFilePath, 3, 20)
+}
+
+func Solve2(inputFilePath string) (int, error) {
+	return solve(inputFilePath, 2, 10_000)
+}
+
+func solve(inputFilePath string, worryLevelDivider int, rounds int) (int, error) {
+	group, err := parseMonkeyGroup(inputFilePath, worryLevelDivider)
 	if err != nil {
 		return 0, errors.Wrap(err, "")
 	}
-	for round := 0; round < 20; round++ {
+	for round := 0; round < rounds; round++ {
 		for _, monkey := range group {
 			monkey.inspectAllItems(group)
 		}
