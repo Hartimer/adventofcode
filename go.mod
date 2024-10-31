@@ -1,11 +1,14 @@
 module adventofcode
 
-go 1.17
+go 1.22.0
+
+toolchain go1.23.2
 
 require (
 	github.com/google/uuid v1.3.0
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.7.0
+	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
 )
 
 require (

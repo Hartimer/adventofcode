@@ -13,6 +13,7 @@ type cellState int
 const (
 	on cellState = iota
 	off
+	unknown
 )
 
 type coordinate struct {
@@ -83,31 +84,38 @@ func (t toggleCuboid) getState(c coordinate) (cellState, bool) {
 	return t.state, true
 }
 
-type reactor2 struct {
-	cuboids    []toggleCuboid
-	dimensions cuboid
+type reactor struct {
+	cuboids         []toggleCuboid
+	dimensions      cuboid
+	fixedDimensions bool
 }
 
-func (r *reactor2) toggle(newState cellState, c cuboid) {
+func (r *reactor) toggle(newState cellState, c cuboid) {
 	t := toggleCuboid{cuboid: c, state: newState}
-	for _, a := range []axis{axisX, axisY, axisZ} {
-		newDimension := r.dimensions[a]
-		newDimension.from = minInt(r.dimensions[a].from, c[a].from)
-		r.dimensions[a] = newDimension
+	if !r.fixedDimensions {
+		for _, a := range []axis{axisX, axisY, axisZ} {
+			newDimension := r.dimensions[a]
+			newDimension.from = minInt(r.dimensions[a].from, c[a].from)
+			newDimension.to = maxInt(r.dimensions[a].to, c[a].to)
+			r.dimensions[a] = newDimension
+		}
 	}
 	r.cuboids = append(r.cuboids, t)
 }
 
-func (r *reactor2) count(s cellState) int {
+func (r *reactor) count(s cellState) int {
 	result := 0
-	for x := r.dimensions[axisX].from; x <= r.dimensions[axisX].to; x++ {
-		for y := r.dimensions[axisY].from; y <= r.dimensions[axisY].to; y++ {
-			for z := r.dimensions[axisZ].from; z <= r.dimensions[axisZ].to; z++ {
+	trimmedX := r.dimensions[axisX]
+	trimmedY := r.dimensions[axisY]
+	trimmedZ := r.dimensions[axisZ]
+	for x := trimmedX.from; x <= trimmedX.to; x++ {
+		for y := trimmedY.from; y <= trimmedY.to; y++ {
+			for z := trimmedZ.from; z <= trimmedZ.to; z++ {
 				coord := coordinate{x, y, z}
-				var coordState cellState
+				coordState := unknown
 				for _, c := range r.cuboids {
-					if s, valid := c.getState(coord); valid {
-						coordState = s
+					if cuboidState, valid := c.getState(coord); valid {
+						coordState = cuboidState
 					}
 				}
 				if coordState == s {
@@ -119,43 +127,16 @@ func (r *reactor2) count(s cellState) int {
 	return result
 }
 
-type reactor struct {
-	cells      map[coordinate]cellState
-	dimensions cuboid
-}
-
-func (r *reactor) count(s cellState) int {
-	result := 0
-	for _, c := range r.cells {
-		if c == s {
-			result++
-		}
+func newReactor(dimensions *cuboid) *reactor {
+	r := &reactor{fixedDimensions: false, dimensions: make(cuboid)}
+	if dimensions != nil {
+		r.dimensions = *dimensions
+		r.fixedDimensions = true
 	}
-	return result
+	return r
 }
 
-func (r *reactor) toggle(newState cellState, c cuboid) {
-	trimmedX := r.dimensions[axisX].trim(c[axisX])
-	for x := trimmedX.from; x <= trimmedX.to; x++ {
-		trimmedY := r.dimensions[axisY].trim(c[axisY])
-		for y := trimmedY.from; y <= trimmedY.to; y++ {
-			trimmedZ := r.dimensions[axisZ].trim(c[axisZ])
-			for z := trimmedZ.from; z <= trimmedZ.to; z++ {
-				c := coordinate{x, y, z}
-				r.cells[c] = newState
-			}
-		}
-	}
-}
-
-func newReactor(dimensions cuboid) *reactor {
-	return &reactor{
-		cells:      map[coordinate]cellState{},
-		dimensions: dimensions,
-	}
-}
-
-func parseInputs(inputFilePath string, dimensions cuboid) (*reactor, error) {
+func parseInputs(inputFilePath string, dimensions *cuboid) (*reactor, error) {
 	r := newReactor(dimensions)
 	for fileLine := range helper.FileLineReader(inputFilePath) {
 		parts, err := helper.SplitAndCheck(fileLine, " ", 2)
@@ -201,7 +182,7 @@ func Solve1(inputFilePath string) (int, error) {
 		axisY: coordinateRange{from: -50, to: 50},
 		axisZ: coordinateRange{from: -50, to: 50},
 	}
-	r, err := parseInputs(inputFilePath, dimensions)
+	r, err := parseInputs(inputFilePath, &dimensions)
 	if err != nil {
 		return 0, errors.Wrap(err, "")
 	}
@@ -209,12 +190,7 @@ func Solve1(inputFilePath string) (int, error) {
 }
 
 func Solve2(inputFilePath string) (int, error) {
-	dimensions := cuboid{
-		axisX: infiniteRange,
-		axisY: infiniteRange,
-		axisZ: infiniteRange,
-	}
-	r, err := parseInputs(inputFilePath, dimensions)
+	r, err := parseInputs(inputFilePath, nil)
 	if err != nil {
 		return 0, errors.Wrap(err, "")
 	}
