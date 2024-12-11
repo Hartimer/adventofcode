@@ -50,74 +50,57 @@ func (f Floor5) move(startPosition Coordinate, direction Direction) (Coordinate,
 		return newPosition, true, true
 	}
 	if f[newPosition.X][newPosition.Y] == '.' {
-		f[startPosition.X][startPosition.Y] = '.'
 		return newPosition, true, false
 	}
 	return startPosition, false, false
 }
 
-func (f Floor5) moveCheckBlock(startPosition Coordinate,
-	direction Direction, visitedPositions map[Coordinate][]Direction) (Coordinate, bool, bool, bool) {
-	newPosition := Coordinate{
-		X: startPosition.X + direction.OffsetX,
-		Y: startPosition.Y + direction.OffsetY,
-	}
-	if newPosition.X < 0 || newPosition.X >= len(f) ||
-		newPosition.Y < 0 || newPosition.Y >= len(f[newPosition.X]) {
-		return newPosition, true, false, true
-	}
-	// turnRightDirection := direction.rotateRight()
-	// turnRightPosition := Coordinate{
-	// 	X: startPosition.X + turnRightDirection.OffsetX,
-	// 	Y: startPosition.Y + turnRightDirection.OffsetY,
-	// }
-	// wouldLoop := f.hitsObstacle(turnRightPosition, turnRightDirection, visitedPositions)
-	wouldLoop := f.couldLoop(startPosition, direction.rotateRight(), visitedPositions)
-	if f[newPosition.X][newPosition.Y] == '.' {
-		f[startPosition.X][startPosition.Y] = '.'
-		return newPosition, true, wouldLoop, false
-	}
-	return startPosition, false, wouldLoop, false
-}
-
-func (f Floor5) hitsObstacle(startPosition Coordinate, direction Direction, visitedPositions map[Coordinate][]Direction) bool {
-	if observedDirections, hasBeenVisited := visitedPositions[startPosition]; !hasBeenVisited || !slices.Contains(observedDirections, direction) {
-		return false
-	}
-	newPosition := Coordinate{
-		X: startPosition.X + direction.OffsetX,
-		Y: startPosition.Y + direction.OffsetY,
-	}
-	if newPosition.X < 0 || newPosition.X >= len(f) ||
-		newPosition.Y < 0 || newPosition.Y >= len(f[newPosition.X]) {
-		return false
-	}
-	if f[newPosition.X][newPosition.Y] == '#' {
-		return true
-	}
-	return f.hitsObstacle(newPosition, direction, visitedPositions)
-}
-
-func (f Floor5) couldLoop(original Coordinate, currentDirection Direction, originalVisitedPositons map[Coordinate][]Direction) bool {
-	currentPosition := original
+func (f Floor5) couldLoop(original Coordinate, originalDirection Direction, originalVisitedPositons map[Coordinate][]Direction) (Coordinate, bool) {
 	visitedPositons := make(map[Coordinate][]Direction)
 	for k, v := range originalVisitedPositons {
 		newV := make([]Direction, len(v))
 		copy(newV, v)
-		visitedPositons[k] = v
+		visitedPositons[k] = newV
 	}
-	newPosition, didMove, movedOutside := f.move(currentPosition, currentDirection)
-	for !movedOutside && newPosition != original {
+	blockPosition, didMove, movedOutside := f.move(original, originalDirection)
+	if !didMove || movedOutside {
+		return original, false
+	}
+	originalBlockContent := f[blockPosition.X][blockPosition.Y]
+	f[blockPosition.X][blockPosition.Y] = '#'
+	defer func() {
+		f[blockPosition.X][blockPosition.Y] = originalBlockContent
+	}()
+	currentDirection := originalDirection
+
+	newPosition, didMove, movedOutside := f.move(original, currentDirection)
+	for !movedOutside {
 		if didMove {
-			visitedPositons[newPosition] = append(visitedPositons[newPosition], currentDirection)
-			currentPosition = newPosition
+			directionsInPosition, seenPosition := visitedPositons[newPosition]
+			if seenPosition && slices.Contains(directionsInPosition, currentDirection) {
+				return blockPosition, true
+			}
 		} else {
 			currentDirection = currentDirection.rotateRight()
-			visitedPositons[currentPosition] = append(visitedPositons[currentPosition], currentDirection)
 		}
-		newPosition, didMove, movedOutside = f.move(currentPosition, currentDirection)
+		visitedPositons[newPosition] = append(visitedPositons[newPosition], currentDirection)
+		newPosition, didMove, movedOutside = f.move(newPosition, currentDirection)
 	}
-	return newPosition == original
+
+	// newPosition, didMove, movedOutside := f.move(original, currentDirection)
+	// for !movedOutside {
+	// 	if didMove {
+	// 		directionsInPosition, seenPosition := visitedPositons[newPosition]
+	// 		if seenPosition && slices.Contains(directionsInPosition, currentDirection) {
+	// 			return blockPosition, true
+	// 		}
+	// 	} else {
+	// 		currentDirection = currentDirection.rotateRight()
+	// 	}
+	// 	visitedPositons[newPosition] = append(visitedPositons[newPosition], currentDirection)
+	// 	newPosition, didMove, movedOutside = f.move(newPosition, currentDirection)
+	// }
+	return blockPosition, false
 }
 
 func TestDay6_1(t *testing.T) {
@@ -142,11 +125,12 @@ func TestDay6_1(t *testing.T) {
 			for fileLine := range helper.FileLineReader(input.filename) {
 				row := make([]rune, 0, len(fileLine))
 				for idx, cell := range fileLine {
-					row = append(row, cell)
 					if cell == '^' {
 						currentPosition.X = len(floor)
 						currentPosition.Y = idx
+						cell = '.'
 					}
+					row = append(row, cell)
 				}
 				floor = append(floor, row)
 			}
@@ -175,13 +159,13 @@ func TestDay6_2(t *testing.T) {
 		filename string
 		expected int
 	}{
-		// {
-		// 	filename: "day6.1.1.input",
-		// 	expected: 6,
-		// },
+		{
+			filename: "day6.1.1.input",
+			expected: 6,
+		},
 		{
 			filename: "day6.1.input",
-			expected: 0,
+			expected: 1434, // not 1456 (too high), got the result elsewhere
 		},
 	}
 
@@ -192,11 +176,12 @@ func TestDay6_2(t *testing.T) {
 			for fileLine := range helper.FileLineReader(input.filename) {
 				row := make([]rune, 0, len(fileLine))
 				for idx, cell := range fileLine {
-					row = append(row, cell)
 					if cell == '^' {
 						currentPosition.X = len(floor)
 						currentPosition.Y = idx
+						cell = '.'
 					}
+					row = append(row, cell)
 				}
 				floor = append(floor, row)
 			}
@@ -206,23 +191,20 @@ func TestDay6_2(t *testing.T) {
 			}
 
 			currentDirection := Up
-			possibleBlocks := 0
-			var couldBlock bool
+			possibleBlocks := map[Coordinate]struct{}{}
 			newPosition, didMove, movedOutside := floor.move(currentPosition, currentDirection)
 			for !movedOutside {
-				if didMove {
-					visitedPositons[newPosition] = append(visitedPositons[newPosition], currentDirection)
-					currentPosition = newPosition
-				} else {
-					currentDirection = currentDirection.rotateRight()
-					visitedPositons[currentPosition] = append(visitedPositons[currentPosition], currentDirection)
-				}
-				newPosition, didMove, couldBlock, movedOutside = floor.moveCheckBlock(currentPosition, currentDirection, visitedPositons)
+				blockPosition, couldBlock := floor.couldLoop(newPosition, currentDirection, visitedPositons)
 				if couldBlock {
-					possibleBlocks++
+					possibleBlocks[blockPosition] = struct{}{}
 				}
+				if !didMove {
+					currentDirection = currentDirection.rotateRight()
+				}
+				visitedPositons[newPosition] = append(visitedPositons[newPosition], currentDirection)
+				newPosition, didMove, movedOutside = floor.move(newPosition, currentDirection)
 			}
-			require.Equal(t, input.expected, possibleBlocks)
+			require.Equal(t, input.expected, len(possibleBlocks))
 		})
 	}
 }
