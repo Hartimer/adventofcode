@@ -55,11 +55,11 @@ func TestDay11_1(t *testing.T) {
 			rounds:   25,
 			expected: 175006,
 		},
-		// {
-		// 	filename: "day11.1.input",
-		// 	rounds:   75,
-		// 	expected: 0,
-		// },
+		{
+			filename: "day11.1.input",
+			rounds:   75,
+			expected: 0,
+		},
 	}
 
 	for _, input := range inputs {
@@ -68,39 +68,48 @@ func TestDay11_1(t *testing.T) {
 				numberStrs := strings.Split(fileLine, " ")
 				result, err := strsToStones(numberStrs)
 				require.NoError(t, err)
-				for i := 0; i < input.rounds; i++ {
-					var newStoneLine []stone
-					for _, s := range result {
-						for _, rule := range rules {
-							newStones, applied := rule(s)
-							if !applied {
-								continue
-							}
-							newStoneLine = append(newStoneLine, newStones...)
-							break
-						}
+				history := map[stone]int{}
+				for _, s := range result {
+					currentCount, exists := history[s]
+					if !exists {
+						history[s] = 1
+					} else {
+						history[s] = currentCount + 1
 					}
-					result = newStoneLine
 				}
-				require.Equal(t, input.expected, len(result))
+				history = traceStones(input.rounds, history)
+				total := 0
+				for _, count := range history {
+					total += count
+				}
+				require.Equal(t, input.expected, total)
 			}
 		})
 	}
 }
 
-func traceStone(s stone, history map[stone][]stone) []stone {
-	if stoneSplit, isKnown := history[s]; isKnown {
-		return stoneSplit
+func traceStones(remainingRounds int, history map[stone]int) map[stone]int {
+	if remainingRounds == 0 {
+		return history
 	}
-	for _, rule := range rules {
-		newStones, applied := rule(s)
-		if !applied {
-			continue
+	roundHistory := map[stone]int{}
+	for s, currentCount := range history {
+		for _, rule := range rules {
+			newStones, applied := rule(s)
+			if !applied {
+				continue
+			}
+			for _, newStone := range newStones {
+				newStoneCurrentCount, exists := roundHistory[newStone]
+				if !exists {
+					newStoneCurrentCount = 0
+				}
+				roundHistory[newStone] = currentCount + newStoneCurrentCount
+			}
+			break
 		}
-		history[s] = newStones
-		return newStones
 	}
-	panic("should never happen")
+	return traceStones(remainingRounds-1, roundHistory)
 }
 
 func strsToStones(levelStrs []string) ([]stone, error) {
